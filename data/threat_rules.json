@@ -1,0 +1,28 @@
+{
+  "malware_ports": [4444, 1337, 31337, 12345, 54321, 6666, 6667, 8888, 9999],
+  "cleartext_ports": {
+    "21":  "FTP",
+    "23":  "Telnet",
+    "80":  "HTTP",
+    "110": "POP3",
+    "143": "IMAP"
+  },
+  "sensitive_ports": {
+    "22":   "SSH",
+    "3389": "RDP",
+    "5900": "VNC",
+    "3306": "MySQL",
+    "5432": "PostgreSQL",
+    "6379": "Redis",
+    "27017": "MongoDB"
+  },
+  "known_malicious_ips": [],
+  "known_c2_domains": [
+    "*.onion",
+    "*.bit"
+  ],
+  "whitelist_ips": [
+    "127.0.0.1",
+    "::1"
+  ]
+}

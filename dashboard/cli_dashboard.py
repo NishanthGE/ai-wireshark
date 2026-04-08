@@ -155,8 +155,9 @@ class Dashboard:
         )
         table.add_column("Time",     width=8,  style="dim")
         table.add_column("Sev",      width=8)
-        table.add_column("Threat",   width=24)
-        table.add_column("Source",   width=16)
+        table.add_column("Threat",   width=22)
+        table.add_column("Source",   width=15)
+        table.add_column("Port",     width=6,  justify="right")
         table.add_column("Score",    width=5,  justify="right")
         table.add_column("AI",       width=3,  justify="center")
 
@@ -168,12 +169,14 @@ class Dashboard:
             _time: datetime = t["_time"]
             ts        = _time.strftime("%H:%M:%S")
             ai_badge  = "[cyan]✓[/cyan]" if t.get("ai_analyzed") else " "
+            port      = str(t.get("dst_port", "?"))
 
             table.add_row(
                 ts,
                 f"[{style}]{severity}[/{style}]",
-                f"[{style}]{name[:24]}[/{style}]",
+                f"[{style}]{name[:22]}[/{style}]",
                 t.get("src_ip", "?"),
+                port,
                 str(score),
                 ai_badge,
             )

@@ -1,14 +1,19 @@
 # config.py — All settings for AI Wireshark
-# Edit this file before running
+# Edit this file OR create a .env file with your keys (recommended)
+
+import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # ─── API Keys ────────────────────────────────────────────────────────────────
-# Get yours at: https://console.anthropic.com
-ANTHROPIC_API_KEY = ""
-OPENAI_API_KEY = ""
-GEMINI_API_KEY = ""
-GROQ_API_KEY = "your-groq-api-key-here"
-# OR use OpenAI instead
-OPENAI_API_KEY = ""  # leave blank if using Anthropic
+ANTHROPIC_API_KEY    = os.getenv("ANTHROPIC_API_KEY", "")
+OPENAI_API_KEY       = os.getenv("OPENAI_API_KEY",    "")
+GEMINI_API_KEY       = os.getenv("GEMINI_API_KEY",    "")
+GROQ_API_KEY         = os.getenv("GROQ_API_KEY",      "")
+VIRUSTOTAL_API_KEY   = os.getenv("VIRUSTOTAL_API_KEY", "")
 
 # Which AI provider to use: "anthropic" or "openai"
 AI_PROVIDER = "groq"
@@ -69,9 +74,6 @@ RISK_CRITICAL = 90
 # ─── Phase 3 — Web API ────────────────────────────────────────────────────────
 API_HOST = "0.0.0.0"             # listen on all interfaces
 API_PORT = 8080                  # open http://localhost:8080 in browser
-
-# ─── Phase 3 — VirusTotal ─────────────────────────────────────────────────────
-VIRUSTOTAL_API_KEY = ""          # get free key at virustotal.com
 
 # ─── Phase 3 — Auto-block ─────────────────────────────────────────────────────
 AUTO_BLOCK_CRITICAL = False      # True = auto iptables block on CRITICAL threats

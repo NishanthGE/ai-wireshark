@@ -167,9 +167,23 @@ async def start_server():
 
 # ── Serializers ───────────────────────────────────────────────────────────────
 
+def _format_time(t: dict) -> str:
+    """Return HH:MM:SS — use _time (datetime) or timestamp (ISO string) as fallback."""
+    _time = t.get("_time")
+    if isinstance(_time, datetime):
+        return _time.strftime("%H:%M:%S")
+    ts = t.get("timestamp", "")
+    if ts:
+        try:
+            return datetime.fromisoformat(ts).strftime("%H:%M:%S")
+        except Exception:
+            return ts[:8]
+    return datetime.now().strftime("%H:%M:%S")
+
+
 def _serialize_threat(t: dict) -> dict:
     return {
-        "time":        t.get("_time", datetime.now()).strftime("%H:%M:%S") if isinstance(t.get("_time"), datetime) else str(t.get("_time", "")),
+        "time":        _format_time(t),
         "type":        t.get("ai_threat_name") or t.get("type", "Unknown"),
         "severity":    t.get("ai_severity")    or t.get("severity", "LOW"),
         "risk_score":  t.get("ai_risk_score")  or t.get("risk_score", 0),

@@ -1,6 +1,30 @@
-__pycache__/
-*.pyc
+# Environment & secrets
 .env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+
+# Database & exports
+data/packets.db
+data/export/
+data/blocked_ips.log
 *.db
-scan_results.txt
-scan_result.txt
+
+# Captured files
+*.pcap
+*.cap
+scan.txt
+scan_result*.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

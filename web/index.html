@@ -188,6 +188,30 @@
       padding: 20px;
       text-align: center;
     }
+
+    /* New threat flash animation */
+    @keyframes flashRow {
+      0%   { background: #1f3a1f; }
+      100% { background: transparent; }
+    }
+    .new-threat td { animation: flashRow 2s ease-out forwards; }
+
+    /* Threat counter badge */
+    #new-badge {
+      display: none;
+      background: #f85149;
+      color: #fff;
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-left: 8px;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
     .dl-btn {
       background: #21262d;
       color: #8b949e;
@@ -243,7 +267,7 @@
   <!-- Threat Feed -->
   <div class="panel" style="grid-row: span 2;">
     <div class="panel-header red" style="display:flex;justify-content:space-between;align-items:center;">
-      <span>🚨 Threat Feed</span>
+      <span>🚨 Threat Feed<span id="new-badge">0</span></span>
       <span>
         <a href="/api/export/csv"  download class="dl-btn">⬇ CSV</a>
         <a href="/api/export/json" download class="dl-btn">⬇ JSON</a>
@@ -305,8 +329,9 @@
 
 <script>
   const BASE = `${location.protocol}//${location.hostname}:${location.port}`;
-  let threatCount = 0;
-  let startTime   = Date.now();
+  let threatCount  = 0;
+  let newBadgeCount = 0;
+  let startTime    = Date.now();
 
   // ── SSE connection ─────────────────────────────────────────────────────────
   function connect() {
@@ -319,7 +344,7 @@
 
     es.onmessage = (e) => {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'threat') addThreat(msg.data);
+      if (msg.type === 'threat') addThreat(msg.data, true);
       if (msg.type === 'stats')  updateStats(msg.data);
     };
 
@@ -348,10 +373,12 @@
   }
 
   // ── Threat row ─────────────────────────────────────────────────────────────
-  function addThreat(t) {
-    const noThreats = document.getElementById('no-threats');
-    const table     = document.getElementById('threat-table');
-    const tbody     = document.getElementById('threat-body');
+  function addThreat(t, isNew = false) {
+    const noThreats  = document.getElementById('no-threats');
+    const table      = document.getElementById('threat-table');
+    const tbody      = document.getElementById('threat-body');
+    const tableWrap  = table.closest('.table-wrap');
+    const badge      = document.getElementById('new-badge');
 
     noThreats.style.display = 'none';
     table.style.display     = '';
@@ -381,6 +408,28 @@
       <td>${ai}</td>
     `;
     row.onclick = () => showDetail(t);
+
+    if (isNew) {
+      // Flash green highlight on new live threats
+      row.classList.add('new-threat');
+      setTimeout(() => row.classList.remove('new-threat'), 2000);
+
+      // Auto-scroll to top so new threat is visible
+      tableWrap.scrollTop = 0;
+
+      // Increment badge counter
+      newBadgeCount++;
+      badge.textContent = newBadgeCount;
+      badge.style.display = 'inline-block';
+
+      // Reset badge after 5s of no new threats
+      clearTimeout(badge._timer);
+      badge._timer = setTimeout(() => {
+        newBadgeCount = 0;
+        badge.style.display = 'none';
+      }, 5000);
+    }
+
     tbody.insertBefore(row, tbody.firstChild);
 
     // Keep max 100 rows

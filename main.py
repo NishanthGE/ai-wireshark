@@ -103,13 +103,18 @@ async def main():
 async def _enrich_threat(threat: dict, use_ai: bool) -> dict:
     """Add GeoIP, VirusTotal, AI analysis, and auto-block to a threat."""
     src_ip = threat.get("src_ip", "")
+    dst_ip = threat.get("dst_ip", "")
 
     # GeoIP (fast, cached, no API key needed)
+    # Try src_ip first; if private, fall back to dst_ip for useful geo data
     geo = geo_lookup(src_ip)
+    if geo.get("country") == "Private" and dst_ip:
+        geo = geo_lookup(dst_ip)
     threat["geo"] = geo
 
-    # VirusTotal (only if API key configured)
-    vt = vt_check(src_ip)
+    # VirusTotal — check whichever IP is public
+    lookup_ip = dst_ip if src_ip.startswith(("10.", "192.168.", "172.")) else src_ip
+    vt = vt_check(lookup_ip)
     threat["vt"] = vt
 
     # AI analysis (HIGH/CRITICAL only — filtered inside analyze())

@@ -193,8 +193,8 @@ class ThreatClassifier:
         severity_order = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
         top = max(threats, key=lambda t: severity_order.get(t["severity"], 0))
 
-        # Deduplicate — suppress re-alerts for the same (src, threat_type) within cooldown
-        dedup_key = (src, top["type"])
+        # Deduplicate — suppress re-alerts for the same (src, type, dst) within cooldown
+        dedup_key = (src, top["type"], dst)
         if now - self._last_alert.get(dedup_key, 0.0) < self._COOLDOWN:
             return None
         self._last_alert[dedup_key] = now

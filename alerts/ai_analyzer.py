@@ -1,73 +1,62 @@
 """
 alerts/ai_analyzer.py
-Sends threat context to Claude / OpenAI and returns
-a structured AI-powered security analysis.
+Supports Anthropic, OpenAI, Gemini, and Groq
 """
 
 import json
 import asyncio
-from typing import Optional
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from config import (
-    ANTHROPIC_API_KEY, OPENAI_API_KEY,
-    AI_PROVIDER, AI_MODEL
-)
+from config import ANTHROPIC_API_KEY, OPENAI_API_KEY, AI_PROVIDER, AI_MODEL
 
+try:
+    from config import GROQ_API_KEY
+except:
+    GROQ_API_KEY = ""
+
+try:
+    from config import GEMINI_API_KEY
+except:
+    GEMINI_API_KEY = ""
 
 SYSTEM_PROMPT = """You are an expert network security analyst inside a real-time 
-packet analysis tool. You will receive details about a suspicious network event 
-that was flagged by automated rules.
-
-Your job is to:
-1. Confirm or refine the threat classification
-2. Explain clearly what is happening in simple terms
-3. Assess the actual risk (not just rule-triggered)
-4. Give 1-2 specific, actionable remediation commands
+packet analysis tool. Analyze suspicious network events.
 
 Always respond in this exact JSON format:
 {
-  "confirmed": true/false,
+  "confirmed": true,
   "threat_name": "concise threat name",
-  "explanation": "2-3 sentence plain English explanation of what is happening",
+  "explanation": "2-3 sentence plain English explanation",
   "risk_score": 0-100,
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
-  "remediation": ["command or step 1", "command or step 2"],
-  "false_positive_reason": "if confirmed=false, explain why"
+  "remediation": ["step 1", "step 2"],
+  "false_positive_reason": ""
 }
-
-Be concise. Security analysts are busy. No fluff."""
+Be concise. No fluff."""
 
 
 def _build_prompt(threat: dict, recent_packets: list) -> str:
-    """Build the prompt from threat data + surrounding packet context."""
     packet_summary = []
     for p in recent_packets[-5:]:
         if p.get("src_ip"):
-            summary = f"  {p.get('src_ip')}:{p.get('src_port','?')} → {p.get('dst_ip')}:{p.get('dst_port','?')} [{p.get('protocol','?')}] {p.get('length',0)}b"
-            if p.get("syn"):
-                summary += " SYN"
-            if p.get("dns_query"):
-                summary += f" DNS:{p['dns_query']}"
+            summary = f"  {p.get('src_ip')}:{p.get('src_port','?')} -> {p.get('dst_ip')}:{p.get('dst_port','?')} [{p.get('protocol','?')}]"
             packet_summary.append(summary)
 
-    return f"""THREAT ALERT — Analyze this security event:
-
-Rule triggered: {threat.get('type')}
-Source IP: {threat.get('src_ip')}
+    return f"""THREAT ALERT:
+Rule: {threat.get('type')}
+Source: {threat.get('src_ip')}
 Destination: {threat.get('dst_ip')}:{threat.get('dst_port')}
-Initial severity: {threat.get('severity')}
-Initial risk score: {threat.get('risk_score')}/100
-Rule description: {threat.get('description')}
+Severity: {threat.get('severity')}
+Risk: {threat.get('risk_score')}/100
+Description: {threat.get('description')}
 
-Recent packets from this source:
-{chr(10).join(packet_summary) if packet_summary else "  No recent packet history"}
+Recent packets:
+{chr(10).join(packet_summary) if packet_summary else "  None"}
 
-Provide your expert analysis in the required JSON format."""
+Respond in JSON format only."""
 
 
 class AIAnalyzer:
-    """Handles AI API calls for threat analysis."""
 
     def __init__(self):
         self.provider = AI_PROVIDER
@@ -75,55 +64,62 @@ class AIAnalyzer:
         self._initialized = False
 
     def _init_client(self):
-        """Lazy-initialize the AI client."""
         if self._initialized:
             return
 
-        if self.provider == "anthropic":
+        if self.provider == "groq":
+            try:
+                from groq import Groq
+                self._client = Groq(api_key=GROQ_API_KEY)
+                self._initialized = True
+                print("[+] Groq AI connected")
+            except Exception as e:
+                print(f"[!] Groq init failed: {e}")
+
+        elif self.provider == "anthropic":
             try:
                 import anthropic
                 self._client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
                 self._initialized = True
-                print("[✓] Anthropic Claude connected")
-            except ImportError:
-                print("[!] anthropic package not installed. Run: pip install anthropic")
+                print("[+] Claude connected")
             except Exception as e:
                 print(f"[!] Anthropic init failed: {e}")
 
-        elif self.provider == "openai":
+        elif self.provider == "gemini":
             try:
-                import openai
-                self._client = openai.OpenAI(api_key=OPENAI_API_KEY)
+                from google import genai
+                self._client = genai.Client(api_key=GEMINI_API_KEY)
                 self._initialized = True
-                print("[✓] OpenAI connected")
-            except ImportError:
-                print("[!] openai package not installed. Run: pip install openai")
+                print("[+] Gemini AI connected")
             except Exception as e:
-                print(f"[!] OpenAI init failed: {e}")
+                print(f"[!] Gemini init failed: {e}")
 
     async def analyze(self, threat: dict, recent_packets: list) -> dict:
-        """
-        Send threat to AI for analysis.
-        Returns enriched threat dict with AI fields added.
-        Falls back to rule-based result if API fails.
-        """
+        # Only call the AI for HIGH and CRITICAL threats to avoid rate limits
+        severity = threat.get("severity", "LOW")
+        if severity not in ("HIGH", "CRITICAL"):
+            return {**threat, "ai_analyzed": False}
+
         self._init_client()
 
         if not self._client:
-            # No AI client — return rule-based result unchanged
             return {**threat, "ai_analyzed": False}
 
         prompt = _build_prompt(threat, recent_packets)
 
         try:
-            # Run in thread pool to avoid blocking async loop
             loop = asyncio.get_event_loop()
             response_text = await loop.run_in_executor(
                 None, self._call_api, prompt
             )
 
-            # Parse JSON response
-            ai_result = json.loads(response_text)
+            clean = response_text.strip()
+            if "```" in clean:
+                clean = clean.split("```")[1]
+                if clean.startswith("json"):
+                    clean = clean[4:]
+
+            ai_result = json.loads(clean)
 
             return {
                 **threat,
@@ -138,7 +134,6 @@ class AIAnalyzer:
             }
 
         except json.JSONDecodeError:
-            # API returned non-JSON — store raw text
             return {
                 **threat,
                 "ai_analyzed":    True,
@@ -150,8 +145,18 @@ class AIAnalyzer:
             return {**threat, "ai_analyzed": False}
 
     def _call_api(self, prompt: str) -> str:
-        """Synchronous API call (runs in thread pool)."""
-        if self.provider == "anthropic":
+        if self.provider == "groq":
+            response = self._client.chat.completions.create(
+                model=AI_MODEL,
+                max_tokens=500,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.choices[0].message.content
+
+        elif self.provider == "anthropic":
             response = self._client.messages.create(
                 model=AI_MODEL,
                 max_tokens=500,
@@ -160,15 +165,12 @@ class AIAnalyzer:
             )
             return response.content[0].text
 
-        elif self.provider == "openai":
-            response = self._client.chat.completions.create(
-                model="gpt-4o",
-                max_tokens=500,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user",   "content": prompt}
-                ]
+        elif self.provider == "gemini":
+            full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt}"
+            response = self._client.models.generate_content(
+                model=AI_MODEL,
+                contents=full_prompt
             )
-            return response.choices[0].message.content
+            return response.text
 
         return "{}"

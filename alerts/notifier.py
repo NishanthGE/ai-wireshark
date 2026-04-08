@@ -33,13 +33,20 @@ def _should_alert(severity: str) -> bool:
     return SEVERITY_ORDER.get(severity, 0) >= SEVERITY_ORDER.get(MIN_ALERT_SEVERITY, 2)
 
 
-def notify(threat: dict):
-    """Send alert through all configured channels."""
+def notify(threat: dict, skip_terminal: bool = False):
+    """Send alert through all configured channels.
+
+    Args:
+        threat: threat dict from classifier / AI analyzer
+        skip_terminal: pass True when dashboard is active so we don't
+                       double-print to stdout (the dashboard shows it)
+    """
     severity = threat.get("ai_severity") or threat.get("severity", "LOW")
     if not _should_alert(severity):
         return
 
-    _notify_terminal(threat)
+    if not skip_terminal:
+        _notify_terminal(threat)
 
     if ALERT_SLACK and SLACK_WEBHOOK_URL:
         _notify_slack(threat)

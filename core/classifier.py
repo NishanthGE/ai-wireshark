@@ -43,6 +43,9 @@ class ThreatClassifier:
         self._arp_tracker      = defaultdict(set)    # IP -> {mac_addresses}
         self._brute_tracker    = defaultdict(list)   # IP -> [timestamps]
         self._beacon_tracker   = defaultdict(list)   # IP:port -> [timestamps]
+        # Deduplication: track last alert time per (ip, threat_type)
+        self._last_alert: dict[tuple, float] = {}
+        self._COOLDOWN = 10.0                        # seconds before re-alerting same threat
 
     def classify(self, packet: dict) -> Optional[dict]:
         """
@@ -189,6 +192,12 @@ class ThreatClassifier:
         # Return the highest severity threat found
         severity_order = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
         top = max(threats, key=lambda t: severity_order.get(t["severity"], 0))
+
+        # Deduplicate — suppress re-alerts for the same (src, threat_type) within cooldown
+        dedup_key = (src, top["type"])
+        if now - self._last_alert.get(dedup_key, 0.0) < self._COOLDOWN:
+            return None
+        self._last_alert[dedup_key] = now
 
         return {
             **top,

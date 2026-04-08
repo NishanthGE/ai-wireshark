@@ -3,14 +3,16 @@
 
 # ─── API Keys ────────────────────────────────────────────────────────────────
 # Get yours at: https://console.anthropic.com
-ANTHROPIC_API_KEY = "sk-ant-YOUR_KEY_HERE"
-
+ANTHROPIC_API_KEY = ""
+OPENAI_API_KEY = ""
+GEMINI_API_KEY = ""
+GROQ_API_KEY = "your-groq-api-key-here"
 # OR use OpenAI instead
 OPENAI_API_KEY = ""  # leave blank if using Anthropic
 
 # Which AI provider to use: "anthropic" or "openai"
-AI_PROVIDER = "anthropic"
-AI_MODEL = "claude-sonnet-4-6"  # or "gpt-4o"
+AI_PROVIDER = "groq"
+AI_MODEL = "llama-3.3-70b-versatile"  # or "gpt-4o"
 
 # ─── Capture Settings ─────────────────────────────────────────────────────────
 DEFAULT_INTERFACE = "eth0"       # change to wlan0 for WiFi, or run --interface
@@ -42,10 +44,16 @@ EMAIL_TO = ""
 MIN_ALERT_SEVERITY = "MEDIUM"
 
 # ─── Storage ──────────────────────────────────────────────────────────────────
+DB_TYPE = "sqlite"               # "sqlite" or "mongodb"
 DB_PATH = "data/packets.db"      # SQLite database path
+MONGODB_URI = "mongodb://localhost:27017"
+MONGODB_DB  = "ai_wireshark"
 EXPORT_PATH = "data/export"      # CSV/JSON export directory
 LOG_ALL_PACKETS = False          # True = store every packet (disk-heavy)
 LOG_THREATS_ONLY = True          # True = store only flagged packets
+
+# ─── AI Analysis ──────────────────────────────────────────────────────────────
+ENABLE_AI = True                 # False = rule-based only, no API calls
 
 # ─── Dashboard ────────────────────────────────────────────────────────────────
 DASHBOARD_REFRESH = 1.0          # seconds between dashboard refresh

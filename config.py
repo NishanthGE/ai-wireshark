@@ -65,3 +65,13 @@ RISK_LOW      = 25
 RISK_MEDIUM   = 50
 RISK_HIGH     = 75
 RISK_CRITICAL = 90
+
+# ─── Phase 3 — Web API ────────────────────────────────────────────────────────
+API_HOST = "0.0.0.0"             # listen on all interfaces
+API_PORT = 8080                  # open http://localhost:8080 in browser
+
+# ─── Phase 3 — VirusTotal ─────────────────────────────────────────────────────
+VIRUSTOTAL_API_KEY = ""          # get free key at virustotal.com
+
+# ─── Phase 3 — Auto-block ─────────────────────────────────────────────────────
+AUTO_BLOCK_CRITICAL = False      # True = auto iptables block on CRITICAL threats

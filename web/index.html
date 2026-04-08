@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚡ AI Wireshark</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: 'Segoe UI', system-ui, monospace;
+      font-size: 13px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 18px; color: #58a6ff; }
+    header h1 span { color: #f0f6fc; font-weight: 300; }
+    #status { font-size: 12px; color: #8b949e; }
+    #status.connected { color: #3fb950; }
+
+    /* ── Stats bar ── */
+    #stats-bar {
+      display: flex;
+      gap: 16px;
+      padding: 10px 20px;
+      background: #161b22;
+      border-bottom: 1px solid #21262d;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 14px;
+      min-width: 110px;
+    }
+    .stat-label { color: #8b949e; font-size: 11px; text-transform: uppercase; }
+    .stat-value { font-size: 22px; font-weight: 700; color: #f0f6fc; }
+    .stat-value.red    { color: #f85149; }
+    .stat-value.orange { color: #d29922; }
+    .stat-value.cyan   { color: #58a6ff; }
+    .stat-value.green  { color: #3fb950; }
+
+    /* ── Main layout ── */
+    main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 12px;
+      padding: 12px 20px;
+      height: calc(100vh - 120px);
+    }
+
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #21262d;
+    }
+    .panel-header.green  { color: #3fb950; border-color: #3fb95033; }
+    .panel-header.red    { color: #f85149; border-color: #f8514933; }
+    .panel-header.blue   { color: #58a6ff; border-color: #58a6ff33; }
+    .panel-header.purple { color: #bc8cff; border-color: #bc8cff33; }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-y: auto; flex: 1; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      position: sticky; top: 0;
+      background: #161b22;
+      color: #8b949e;
+      font-size: 11px;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid #21262d;
+    }
+    td { padding: 5px 10px; border-bottom: 1px solid #21262d11; white-space: nowrap; }
+    tr:hover td { background: #1c2128; }
+
+    /* Severity badges */
+    .sev {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .sev-CRITICAL { background: #6e1b1b; color: #f85149; }
+    .sev-HIGH     { background: #3d1f00; color: #d29922; }
+    .sev-MEDIUM   { background: #1a2d1a; color: #3fb950; }
+    .sev-LOW      { background: #1a2040; color: #58a6ff; }
+
+    .ai-badge { color: #58a6ff; font-weight: 700; }
+    .flag { font-size: 16px; }
+
+    /* Score bar */
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .score-fill {
+      height: 4px;
+      border-radius: 2px;
+      background: #30363d;
+      width: 50px;
+      overflow: hidden;
+    }
+    .score-fill-inner {
+      height: 100%;
+      border-radius: 2px;
+      background: #f85149;
+    }
+
+    /* Blocked IPs */
+    .blocked-ip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      border-bottom: 1px solid #21262d;
+    }
+    .unblock-btn {
+      background: #6e1b1b;
+      color: #f85149;
+      border: 1px solid #f8514944;
+      border-radius: 4px;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .unblock-btn:hover { background: #f85149; color: #fff; }
+
+    /* Threat detail panel */
+    #detail-panel {
+      position: fixed;
+      right: 0; top: 0; bottom: 0;
+      width: 380px;
+      background: #161b22;
+      border-left: 1px solid #30363d;
+      padding: 16px;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+      z-index: 100;
+    }
+    #detail-panel.open { transform: translateX(0); }
+    #detail-close {
+      background: none; border: none; color: #8b949e;
+      font-size: 18px; cursor: pointer; float: right;
+    }
+    #detail-close:hover { color: #f0f6fc; }
+    .detail-row { margin: 8px 0; }
+    .detail-label { color: #8b949e; font-size: 11px; }
+    .detail-value { color: #f0f6fc; margin-top: 2px; }
+    .remediation-step {
+      background: #0d1117;
+      border-left: 3px solid #58a6ff;
+      padding: 4px 8px;
+      margin: 4px 0;
+      border-radius: 2px;
+      font-size: 12px;
+    }
+
+    #no-threats {
+      color: #8b949e;
+      padding: 20px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ AI Wireshark <span>— Real-time Threat Detection</span></h1>
+  <div id="status">● Connecting...</div>
+</header>
+
+<div id="stats-bar">
+  <div class="stat-card">
+    <div class="stat-label">Packets</div>
+    <div class="stat-value cyan" id="s-packets">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Threats</div>
+    <div class="stat-value red" id="s-threats">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Critical</div>
+    <div class="stat-value red" id="s-critical">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">High</div>
+    <div class="stat-value orange" id="s-high">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">AI Analyses</div>
+    <div class="stat-value cyan" id="s-ai">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Blocked IPs</div>
+    <div class="stat-value red" id="s-blocked">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Runtime</div>
+    <div class="stat-value green" id="s-runtime">00:00</div>
+  </div>
+</div>
+
+<main>
+  <!-- Threat Feed -->
+  <div class="panel" style="grid-row: span 2;">
+    <div class="panel-header red">🚨 Threat Feed</div>
+    <div class="table-wrap">
+      <div id="no-threats">No threats detected yet — monitoring...</div>
+      <table id="threat-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Sev</th>
+            <th>Threat</th>
+            <th>Source</th>
+            <th>Port</th>
+            <th>Score</th>
+            <th>Geo</th>
+            <th>AI</th>
+          </tr>
+        </thead>
+        <tbody id="threat-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Live Packets -->
+  <div class="panel">
+    <div class="panel-header green">📡 Live Packets</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Destination</th>
+            <th>Proto</th>
+            <th>Size</th>
+            <th>Flag</th>
+          </tr>
+        </thead>
+        <tbody id="packet-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Blocked IPs -->
+  <div class="panel">
+    <div class="panel-header purple">🛡️ Blocked IPs</div>
+    <div id="blocked-list" class="table-wrap">
+      <div style="color:#8b949e;padding:20px;text-align:center;">No IPs blocked</div>
+    </div>
+  </div>
+</main>
+
+<!-- Threat Detail Slide-in -->
+<div id="detail-panel">
+  <button id="detail-close" onclick="closeDetail()">✕</button>
+  <div id="detail-content"></div>
+</div>
+
+<script>
+  const BASE = `${location.protocol}//${location.hostname}:${location.port}`;
+  let threatCount = 0;
+  let startTime   = Date.now();
+
+  // ── SSE connection ─────────────────────────────────────────────────────────
+  function connect() {
+    const es = new EventSource(`${BASE}/api/stream`);
+
+    es.onopen = () => {
+      document.getElementById('status').textContent = '● Connected';
+      document.getElementById('status').className = 'connected';
+    };
+
+    es.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'threat') addThreat(msg.data);
+      if (msg.type === 'stats')  updateStats(msg.data);
+    };
+
+    es.onerror = () => {
+      document.getElementById('status').textContent = '● Reconnecting...';
+      document.getElementById('status').className = '';
+      es.close();
+      setTimeout(connect, 3000);
+    };
+  }
+
+  // ── Fetch initial data ─────────────────────────────────────────────────────
+  async function fetchInitial() {
+    try {
+      const [threats, packets, stats, blocked] = await Promise.all([
+        fetch(`${BASE}/api/threats`).then(r => r.json()),
+        fetch(`${BASE}/api/packets`).then(r => r.json()),
+        fetch(`${BASE}/api/stats`).then(r => r.json()),
+        fetch(`${BASE}/api/blocked`).then(r => r.json()),
+      ]);
+      threats.forEach(addThreat);
+      packets.forEach(addPacket);
+      updateStats(stats);
+      updateBlocked(blocked.blocked_ips || []);
+    } catch (e) { /* server not ready yet */ }
+  }
+
+  // ── Threat row ─────────────────────────────────────────────────────────────
+  function addThreat(t) {
+    const noThreats = document.getElementById('no-threats');
+    const table     = document.getElementById('threat-table');
+    const tbody     = document.getElementById('threat-body');
+
+    noThreats.style.display = 'none';
+    table.style.display     = '';
+
+    const sev   = t.severity || 'LOW';
+    const score = t.risk_score || 0;
+    const geo   = t.geo || {};
+    const flag  = geo.flag || '🌐';
+    const country = geo.country || '';
+    const ai    = t.ai_analyzed ? '<span class="ai-badge">✓</span>' : '';
+
+    const row = document.createElement('tr');
+    row.style.cursor = 'pointer';
+    row.innerHTML = `
+      <td style="color:#8b949e">${t.time}</td>
+      <td><span class="sev sev-${sev}">${sev}</span></td>
+      <td>${t.type}</td>
+      <td style="font-family:monospace">${t.src_ip}</td>
+      <td style="color:#8b949e">${t.dst_port || '—'}</td>
+      <td>
+        <div class="score-bar">
+          <span>${score}</span>
+          <div class="score-fill"><div class="score-fill-inner" style="width:${score}%"></div></div>
+        </div>
+      </td>
+      <td><span class="flag" title="${country}">${flag}</span> <span style="color:#8b949e;font-size:11px">${geo.city || country}</span></td>
+      <td>${ai}</td>
+    `;
+    row.onclick = () => showDetail(t);
+    tbody.insertBefore(row, tbody.firstChild);
+
+    // Keep max 100 rows
+    while (tbody.rows.length > 100) tbody.deleteRow(tbody.rows.length - 1);
+
+    threatCount++;
+  }
+
+  // ── Packet row ─────────────────────────────────────────────────────────────
+  function addPacket(p) {
+    const tbody = document.getElementById('packet-body');
+    const protoColor = {TCP:'#58a6ff', UDP:'#3fb950', ICMP:'#d29922'};
+    const color = protoColor[p.protocol] || '#8b949e';
+    const flag  = p.flagged ? '<span style="color:#f85149;font-weight:bold">!</span>' : '';
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td style="font-family:monospace">${p.src_ip}:${p.src_port||'?'}</td>
+      <td style="font-family:monospace">${p.dst_ip}:${p.dst_port||'?'}</td>
+      <td style="color:${color}">${p.protocol}</td>
+      <td style="color:#8b949e">${p.length}b</td>
+      <td>${flag}</td>
+    `;
+    tbody.insertBefore(row, tbody.firstChild);
+    while (tbody.rows.length > 50) tbody.deleteRow(tbody.rows.length - 1);
+  }
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  function updateStats(s) {
+    if (!s || !Object.keys(s).length) return;
+    setText('s-packets',  (s.total_packets || 0).toLocaleString());
+    setText('s-threats',  s.threats_found  || 0);
+    setText('s-critical', s.critical_count || 0);
+    setText('s-high',     s.high_count     || 0);
+    setText('s-ai',       s.ai_analyses    || 0);
+  }
+
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  // ── Blocked IPs ────────────────────────────────────────────────────────────
+  function updateBlocked(ips) {
+    const el = document.getElementById('blocked-list');
+    document.getElementById('s-blocked').textContent = ips.length;
+    if (!ips.length) {
+      el.innerHTML = '<div style="color:#8b949e;padding:20px;text-align:center;">No IPs blocked</div>';
+      return;
+    }
+    el.innerHTML = ips.map(ip => `
+      <div class="blocked-ip">
+        <span style="font-family:monospace">${ip}</span>
+        <button class="unblock-btn" onclick="unblock('${ip}')">Unblock</button>
+      </div>
+    `).join('');
+  }
+
+  async function unblock(ip) {
+    await fetch(`${BASE}/api/blocked/${ip}`, {method: 'DELETE'});
+    const r = await fetch(`${BASE}/api/blocked`).then(r => r.json());
+    updateBlocked(r.blocked_ips || []);
+  }
+
+  // ── Threat detail ──────────────────────────────────────────────────────────
+  function showDetail(t) {
+    const geo = t.geo || {};
+    const vt  = t.vt  || {};
+    const rem = t.remediation || [];
+
+    document.getElementById('detail-content').innerHTML = `
+      <h2 style="color:#f85149;margin-bottom:12px">${t.type}</h2>
+      <div class="detail-row">
+        <div class="detail-label">Severity</div>
+        <div class="detail-value"><span class="sev sev-${t.severity}">${t.severity}</span></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-label">Risk Score</div>
+        <div class="detail-value">${t.risk_score}/100</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-label">Source → Destination</div>
+        <div class="detail-value" style="font-family:monospace">${t.src_ip} → ${t.dst_ip}:${t.dst_port||'?'}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-label">Time</div>
+        <div class="detail-value">${t.time}</div>
+      </div>
+      ${geo.country ? `
+      <div class="detail-row">
+        <div class="detail-label">Location</div>
+        <div class="detail-value">${geo.flag} ${geo.city ? geo.city + ', ' : ''}${geo.country}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-label">ISP</div>
+        <div class="detail-value">${geo.isp || '—'}</div>
+      </div>` : ''}
+      ${vt.checked ? `
+      <div class="detail-row">
+        <div class="detail-label">VirusTotal</div>
+        <div class="detail-value" style="color:${vt.verdict==='malicious'?'#f85149':vt.verdict==='suspicious'?'#d29922':'#3fb950'}">
+          ${vt.verdict} (${vt.score})
+        </div>
+      </div>` : ''}
+      ${t.description ? `
+      <div class="detail-row">
+        <div class="detail-label">AI Analysis</div>
+        <div class="detail-value" style="color:#8b949e;line-height:1.5">${t.description}</div>
+      </div>` : ''}
+      ${rem.length ? `
+      <div class="detail-row">
+        <div class="detail-label">Remediation</div>
+        <div>${rem.map(s => `<div class="remediation-step">→ ${s}</div>`).join('')}</div>
+      </div>` : ''}
+      ${t.blocked ? '<div style="color:#f85149;margin-top:12px;font-weight:700">🛡️ IP Auto-Blocked</div>' : ''}
+    `;
+    document.getElementById('detail-panel').classList.add('open');
+  }
+
+  function closeDetail() {
+    document.getElementById('detail-panel').classList.remove('open');
+  }
+
+  // ── Runtime clock ──────────────────────────────────────────────────────────
+  setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const s = String(elapsed % 60).padStart(2, '0');
+    setText('s-runtime', `${m}:${s}`);
+  }, 1000);
+
+  // ── Poll packets every 2s ──────────────────────────────────────────────────
+  async function pollPackets() {
+    try {
+      const packets = await fetch(`${BASE}/api/packets?limit=20`).then(r => r.json());
+      const tbody = document.getElementById('packet-body');
+      tbody.innerHTML = '';
+      packets.forEach(addPacket);
+    } catch(e) {}
+  }
+
+  async function pollStats() {
+    try {
+      const [stats, blocked] = await Promise.all([
+        fetch(`${BASE}/api/stats`).then(r => r.json()),
+        fetch(`${BASE}/api/blocked`).then(r => r.json()),
+      ]);
+      updateStats(stats);
+      updateBlocked(blocked.blocked_ips || []);
+    } catch(e) {}
+  }
+
+  setInterval(pollPackets, 2000);
+  setInterval(pollStats,   3000);
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  fetchInitial();
+  connect();
+</script>
+</body>
+</html>

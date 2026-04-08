@@ -153,12 +153,12 @@ class Dashboard:
             expand=True,
             padding=(0, 1),
         )
-        table.add_column("Time",     width=8,  style="dim")
-        table.add_column("Sev",      width=8)
-        table.add_column("Threat",   width=22)
-        table.add_column("Source",   width=15)
-        table.add_column("Port",     width=6,  justify="right")
-        table.add_column("Score",    width=5,  justify="right")
+        table.add_column("Time",     width=7,  style="dim")
+        table.add_column("Sev",      width=6)
+        table.add_column("Threat",   width=18)
+        table.add_column("Source",   width=13)
+        table.add_column("Port",     width=5,  justify="right")
+        table.add_column("Sc",       width=4,  justify="right")
         table.add_column("AI",       width=3,  justify="center")
 
         for t in reversed(list(self.threats)):

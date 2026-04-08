@@ -45,7 +45,7 @@ class ThreatClassifier:
         self._beacon_tracker   = defaultdict(list)   # IP:port -> [timestamps]
         # Deduplication: track last alert time per (ip, threat_type)
         self._last_alert: dict[tuple, float] = {}
-        self._COOLDOWN = 10.0                        # seconds before re-alerting same threat
+        self._COOLDOWN = 30.0                        # seconds before re-alerting same threat
 
     def classify(self, packet: dict) -> Optional[dict]:
         """

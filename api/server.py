@@ -73,6 +73,32 @@ if FASTAPI_AVAILABLE and app:
     async def get_threats(limit: int = 50):
         return JSONResponse([_serialize_threat(t) for t in list(_threats)[:limit]])
 
+    @app.get("/api/export/json")
+    async def export_json():
+        import json as _json
+        data = [_serialize_threat(t) for t in list(_threats)]
+        content = _json.dumps(data, indent=2)
+        return StreamingResponse(
+            iter([content]),
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=threats.json"}
+        )
+
+    @app.get("/api/export/csv")
+    async def export_csv():
+        import csv, io
+        output = io.StringIO()
+        fields = ["time", "type", "severity", "risk_score", "src_ip", "dst_ip", "dst_port", "description", "ai_analyzed"]
+        writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        for t in list(_threats):
+            writer.writerow(_serialize_threat(t))
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=threats.csv"}
+        )
+
     @app.get("/api/packets")
     async def get_packets(limit: int = 100):
         return JSONResponse([_serialize_packet(p) for p in list(_packets)[:limit]])

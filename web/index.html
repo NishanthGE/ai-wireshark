@@ -188,6 +188,17 @@
       padding: 20px;
       text-align: center;
     }
+    .dl-btn {
+      background: #21262d;
+      color: #8b949e;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      text-decoration: none;
+      margin-left: 4px;
+    }
+    .dl-btn:hover { background: #30363d; color: #f0f6fc; }
   </style>
 </head>
 <body>
@@ -231,7 +242,13 @@
 <main>
   <!-- Threat Feed -->
   <div class="panel" style="grid-row: span 2;">
-    <div class="panel-header red">🚨 Threat Feed</div>
+    <div class="panel-header red" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>🚨 Threat Feed</span>
+      <span>
+        <a href="/api/export/csv"  download class="dl-btn">⬇ CSV</a>
+        <a href="/api/export/json" download class="dl-btn">⬇ JSON</a>
+      </span>
+    </div>
     <div class="table-wrap">
       <div id="no-threats">No threats detected yet — monitoring...</div>
       <table id="threat-table" style="display:none;">

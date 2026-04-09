@@ -329,6 +329,14 @@
 
 <script>
   const BASE = `${location.protocol}//${location.hostname}:${location.port}`;
+
+  // HTML escape to prevent XSS from AI responses / packet data
+  function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
   let threatCount  = 0;
   let newBadgeCount = 0;
   let startTime    = Date.now();
@@ -392,19 +400,20 @@
 
     const row = document.createElement('tr');
     row.style.cursor = 'pointer';
+    const safeScore = Math.min(Math.max(parseInt(score) || 0, 0), 100);
     row.innerHTML = `
-      <td style="color:#8b949e">${t.time}</td>
-      <td><span class="sev sev-${sev}">${sev}</span></td>
-      <td>${t.type}</td>
-      <td style="font-family:monospace">${t.src_ip}</td>
-      <td style="color:#8b949e">${t.dst_port || '—'}</td>
+      <td style="color:#8b949e">${esc(t.time)}</td>
+      <td><span class="sev sev-${esc(sev)}">${esc(sev)}</span></td>
+      <td>${esc(t.type)}</td>
+      <td style="font-family:monospace">${esc(t.src_ip)}</td>
+      <td style="color:#8b949e">${esc(String(t.dst_port || '—'))}</td>
       <td>
         <div class="score-bar">
-          <span>${score}</span>
-          <div class="score-fill"><div class="score-fill-inner" style="width:${score}%"></div></div>
+          <span>${safeScore}</span>
+          <div class="score-fill"><div class="score-fill-inner" style="width:${safeScore}%"></div></div>
         </div>
       </td>
-      <td><span class="flag" title="${country}">${flag}</span> <span style="color:#8b949e;font-size:11px">${geo.city || country}</span></td>
+      <td><span class="flag" title="${esc(country)}">${esc(flag)}</span> <span style="color:#8b949e;font-size:11px">${esc(geo.city || country)}</span></td>
       <td>${ai}</td>
     `;
     row.onclick = () => showDetail(t);
@@ -447,10 +456,10 @@
 
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td style="font-family:monospace">${p.src_ip}:${p.src_port||'?'}</td>
-      <td style="font-family:monospace">${p.dst_ip}:${p.dst_port||'?'}</td>
-      <td style="color:${color}">${p.protocol}</td>
-      <td style="color:#8b949e">${p.length}b</td>
+      <td style="font-family:monospace">${esc(p.src_ip)}:${esc(String(p.src_port||'?'))}</td>
+      <td style="font-family:monospace">${esc(p.dst_ip)}:${esc(String(p.dst_port||'?'))}</td>
+      <td style="color:${color}">${esc(p.protocol)}</td>
+      <td style="color:#8b949e">${parseInt(p.length)||0}b</td>
       <td>${flag}</td>
     `;
     tbody.insertBefore(row, tbody.firstChild);
@@ -480,12 +489,21 @@
       el.innerHTML = '<div style="color:#8b949e;padding:20px;text-align:center;">No IPs blocked</div>';
       return;
     }
-    el.innerHTML = ips.map(ip => `
-      <div class="blocked-ip">
-        <span style="font-family:monospace">${ip}</span>
-        <button class="unblock-btn" onclick="unblock('${ip}')">Unblock</button>
-      </div>
-    `).join('');
+    el.innerHTML = '';
+    ips.forEach(ip => {
+      const div = document.createElement('div');
+      div.className = 'blocked-ip';
+      const span = document.createElement('span');
+      span.style.fontFamily = 'monospace';
+      span.textContent = ip;
+      const btn = document.createElement('button');
+      btn.className = 'unblock-btn';
+      btn.textContent = 'Unblock';
+      btn.addEventListener('click', () => unblock(ip));
+      div.appendChild(span);
+      div.appendChild(btn);
+      el.appendChild(div);
+    });
   }
 
   async function unblock(ip) {
@@ -500,49 +518,50 @@
     const vt  = t.vt  || {};
     const rem = t.remediation || [];
 
+    const vtColor = vt.verdict==='malicious'?'#f85149':vt.verdict==='suspicious'?'#d29922':'#3fb950';
     document.getElementById('detail-content').innerHTML = `
-      <h2 style="color:#f85149;margin-bottom:12px">${t.type}</h2>
+      <h2 style="color:#f85149;margin-bottom:12px">${esc(t.type)}</h2>
       <div class="detail-row">
         <div class="detail-label">Severity</div>
-        <div class="detail-value"><span class="sev sev-${t.severity}">${t.severity}</span></div>
+        <div class="detail-value"><span class="sev sev-${esc(t.severity)}">${esc(t.severity)}</span></div>
       </div>
       <div class="detail-row">
         <div class="detail-label">Risk Score</div>
-        <div class="detail-value">${t.risk_score}/100</div>
+        <div class="detail-value">${parseInt(t.risk_score)||0}/100</div>
       </div>
       <div class="detail-row">
         <div class="detail-label">Source → Destination</div>
-        <div class="detail-value" style="font-family:monospace">${t.src_ip} → ${t.dst_ip}:${t.dst_port||'?'}</div>
+        <div class="detail-value" style="font-family:monospace">${esc(t.src_ip)} → ${esc(t.dst_ip)}:${esc(String(t.dst_port||'?'))}</div>
       </div>
       <div class="detail-row">
         <div class="detail-label">Time</div>
-        <div class="detail-value">${t.time}</div>
+        <div class="detail-value">${esc(t.time)}</div>
       </div>
       ${geo.country ? `
       <div class="detail-row">
         <div class="detail-label">Location</div>
-        <div class="detail-value">${geo.flag} ${geo.city ? geo.city + ', ' : ''}${geo.country}</div>
+        <div class="detail-value">${esc(geo.flag)} ${geo.city ? esc(geo.city) + ', ' : ''}${esc(geo.country)}</div>
       </div>
       <div class="detail-row">
         <div class="detail-label">ISP</div>
-        <div class="detail-value">${geo.isp || '—'}</div>
+        <div class="detail-value">${esc(geo.isp || '—')}</div>
       </div>` : ''}
       ${vt.checked ? `
       <div class="detail-row">
         <div class="detail-label">VirusTotal</div>
-        <div class="detail-value" style="color:${vt.verdict==='malicious'?'#f85149':vt.verdict==='suspicious'?'#d29922':'#3fb950'}">
-          ${vt.verdict} (${vt.score})
+        <div class="detail-value" style="color:${vtColor}">
+          ${esc(vt.verdict)} (${esc(vt.score)})
         </div>
       </div>` : ''}
       ${t.description ? `
       <div class="detail-row">
         <div class="detail-label">AI Analysis</div>
-        <div class="detail-value" style="color:#8b949e;line-height:1.5">${t.description}</div>
+        <div class="detail-value" style="color:#8b949e;line-height:1.5">${esc(t.description)}</div>
       </div>` : ''}
       ${rem.length ? `
       <div class="detail-row">
         <div class="detail-label">Remediation</div>
-        <div>${rem.map(s => `<div class="remediation-step">→ ${s}</div>`).join('')}</div>
+        <div>${rem.map(s => `<div class="remediation-step">→ ${esc(s)}</div>`).join('')}</div>
       </div>` : ''}
       ${t.blocked ? '<div style="color:#f85149;margin-top:12px;font-weight:700">🛡️ IP Auto-Blocked</div>' : ''}
     `;

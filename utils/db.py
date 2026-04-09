@@ -81,103 +81,102 @@ def get_recent_threats(limit: int = 50) -> list:
 
 def _init_sqlite():
     os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    cur  = conn.cursor()
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS threats (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp     TEXT NOT NULL,
-            threat_type   TEXT,
-            severity      TEXT,
-            risk_score    INTEGER,
-            src_ip        TEXT,
-            dst_ip        TEXT,
-            dst_port      INTEGER,
-            description   TEXT,
-            ai_analyzed   INTEGER DEFAULT 0,
-            ai_confirmed  INTEGER DEFAULT 1,
-            ai_explanation  TEXT,
-            ai_remediation  TEXT,
-            raw_packet    TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS packets (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            src_ip    TEXT,
-            dst_ip    TEXT,
-            protocol  TEXT,
-            src_port  INTEGER,
-            dst_port  INTEGER,
-            length    INTEGER,
-            flagged   INTEGER DEFAULT 0
-        )
-    """)
-
-    conn.commit()
-    conn.close()
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS threats (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp     TEXT NOT NULL,
+                threat_type   TEXT,
+                severity      TEXT,
+                risk_score    INTEGER,
+                src_ip        TEXT,
+                dst_ip        TEXT,
+                dst_port      INTEGER,
+                description   TEXT,
+                ai_analyzed   INTEGER DEFAULT 0,
+                ai_confirmed  INTEGER DEFAULT 1,
+                ai_explanation  TEXT,
+                ai_remediation  TEXT,
+                raw_packet    TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS packets (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                src_ip    TEXT,
+                dst_ip    TEXT,
+                protocol  TEXT,
+                src_port  INTEGER,
+                dst_port  INTEGER,
+                length    INTEGER,
+                flagged   INTEGER DEFAULT 0
+            )
+        """)
+        conn.commit()
 
 
 def _save_threat_sqlite(threat: dict):
-    conn = sqlite3.connect(DB_PATH)
-    cur  = conn.cursor()
-    cur.execute("""
-        INSERT INTO threats
-            (timestamp, threat_type, severity, risk_score,
-             src_ip, dst_ip, dst_port, description,
-             ai_analyzed, ai_confirmed, ai_explanation,
-             ai_remediation, raw_packet)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-    """, (
-        datetime.now().isoformat(),
-        threat.get("ai_threat_name") or threat.get("type"),
-        threat.get("ai_severity")    or threat.get("severity"),
-        threat.get("ai_risk_score")  or threat.get("risk_score"),
-        threat.get("src_ip"),
-        threat.get("dst_ip"),
-        threat.get("dst_port"),
-        threat.get("ai_explanation") or threat.get("description"),
-        1 if threat.get("ai_analyzed") else 0,
-        1 if threat.get("ai_confirmed", True) else 0,
-        threat.get("ai_explanation", ""),
-        json.dumps(threat.get("ai_remediation", [])),
-        json.dumps(threat.get("packet", {})),
-    ))
-    conn.commit()
-    conn.close()
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("""
+                INSERT INTO threats
+                    (timestamp, threat_type, severity, risk_score,
+                     src_ip, dst_ip, dst_port, description,
+                     ai_analyzed, ai_confirmed, ai_explanation,
+                     ai_remediation, raw_packet)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                datetime.now().isoformat(),
+                threat.get("ai_threat_name") or threat.get("type"),
+                threat.get("ai_severity")    or threat.get("severity"),
+                threat.get("ai_risk_score")  or threat.get("risk_score"),
+                threat.get("src_ip"),
+                threat.get("dst_ip"),
+                threat.get("dst_port"),
+                threat.get("ai_explanation") or threat.get("description"),
+                1 if threat.get("ai_analyzed") else 0,
+                1 if threat.get("ai_confirmed", True) else 0,
+                threat.get("ai_explanation", ""),
+                json.dumps(threat.get("ai_remediation", [])),
+                json.dumps(threat.get("packet", {})),
+            ))
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"[!] DB save threat failed: {e}")
 
 
 def _save_packet_sqlite(packet: dict, flagged: bool):
-    conn = sqlite3.connect(DB_PATH)
-    cur  = conn.cursor()
-    cur.execute("""
-        INSERT INTO packets
-            (timestamp, src_ip, dst_ip, protocol, src_port, dst_port, length, flagged)
-        VALUES (?,?,?,?,?,?,?,?)
-    """, (
-        datetime.now().isoformat(),
-        packet.get("src_ip"),
-        packet.get("dst_ip"),
-        packet.get("protocol"),
-        packet.get("src_port"),
-        packet.get("dst_port"),
-        packet.get("length"),
-        1 if flagged else 0,
-    ))
-    conn.commit()
-    conn.close()
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("""
+                INSERT INTO packets
+                    (timestamp, src_ip, dst_ip, protocol, src_port, dst_port, length, flagged)
+                VALUES (?,?,?,?,?,?,?,?)
+            """, (
+                datetime.now().isoformat(),
+                packet.get("src_ip"),
+                packet.get("dst_ip"),
+                packet.get("protocol"),
+                packet.get("src_port"),
+                packet.get("dst_port"),
+                packet.get("length"),
+                1 if flagged else 0,
+            ))
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"[!] DB save packet failed: {e}")
 
 
 def _get_threats_sqlite(limit: int) -> list:
-    conn = sqlite3.connect(DB_PATH)
-    cur  = conn.cursor()
-    cur.execute("SELECT * FROM threats ORDER BY id DESC LIMIT ?", (limit,))
-    rows = cur.fetchall()
-    conn.close()
-    return rows
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cur = conn.execute("SELECT * FROM threats ORDER BY id DESC LIMIT ?", (limit,))
+            return cur.fetchall()
+    except sqlite3.Error as e:
+        print(f"[!] DB read failed: {e}")
+        return []
 
 
 # ── MongoDB backend ───────────────────────────────────────────────────────────
@@ -217,11 +216,6 @@ def _save_packet_mongo(packet: dict, flagged: bool):
 
 def _get_threats_mongo(limit: int) -> list:
     """Return threats as list-of-tuples matching the SQLite column order."""
-    cols = [
-        "id", "timestamp", "threat_type", "severity", "risk_score",
-        "src_ip", "dst_ip", "dst_port", "description",
-        "ai_analyzed", "ai_confirmed", "ai_explanation", "ai_remediation", "raw_packet"
-    ]
     docs  = list(_get_mongo().threats.find().sort("_id", -1).limit(limit))
     rows  = []
     for i, doc in enumerate(docs):

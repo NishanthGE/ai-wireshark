@@ -3,7 +3,6 @@ alerts/notifier.py
 Sends alerts to terminal, Slack, and email.
 """
 
-import json
 import smtplib
 import requests
 from email.mime.text import MIMEText
@@ -120,8 +119,8 @@ def _notify_slack(threat: dict):
 
     try:
         requests.post(SLACK_WEBHOOK_URL, json=payload, timeout=5)
-    except Exception as e:
-        print(f"[!] Slack notification failed: {e}")
+    except Exception:
+        print("[!] Slack notification failed — check webhook URL in .env")
 
 
 def _notify_email(threat: dict):

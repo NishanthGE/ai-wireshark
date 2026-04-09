@@ -6,6 +6,7 @@ Runs alongside the capture loop via asyncio.
 """
 
 import asyncio
+import ipaddress
 import json
 import os
 import sys
@@ -17,6 +18,7 @@ from config import API_HOST, API_PORT
 
 try:
     from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
     from fastapi.staticfiles import StaticFiles
     import uvicorn
@@ -25,6 +27,14 @@ except ImportError:
     FASTAPI_AVAILABLE = False
 
 app = FastAPI(title="AI Wireshark API", version="3.0") if FASTAPI_AVAILABLE else None
+
+if FASTAPI_AVAILABLE and app:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[f"http://localhost:{API_PORT}", f"http://127.0.0.1:{API_PORT}"],
+        allow_methods=["GET", "DELETE"],
+        allow_headers=["*"],
+    )
 
 # Shared state — populated by main.py
 _threats:  deque = deque(maxlen=200)
@@ -113,6 +123,10 @@ if FASTAPI_AVAILABLE and app:
 
     @app.delete("/api/blocked/{ip}")
     async def unblock(ip: str):
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            return JSONResponse({"success": False, "error": "Invalid IP address"}, status_code=400)
         from core.blocker import unblock_ip
         success = unblock_ip(ip)
         return JSONResponse({"success": success, "ip": ip})

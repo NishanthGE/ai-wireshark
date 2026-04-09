@@ -5,12 +5,22 @@ Only runs on Linux with root privileges.
 Enable via AUTO_BLOCK_CRITICAL = True in config.py.
 """
 
+import ipaddress
 import subprocess
 import sys
 import os
 from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from config import AUTO_BLOCK_CRITICAL
+
+
+def _valid_ip(ip: str) -> bool:
+    """Validate that ip is a proper IPv4/IPv6 address (no CIDR, no flags)."""
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 _blocked_ips: set[str] = set()
 
@@ -23,7 +33,7 @@ def block_ip(ip: str, reason: str = "") -> bool:
     if not AUTO_BLOCK_CRITICAL:
         return False
 
-    if not ip or ip in _blocked_ips:
+    if not ip or not _valid_ip(ip) or ip in _blocked_ips:
         return False
 
     # Skip private/loopback IPs
@@ -51,7 +61,7 @@ def block_ip(ip: str, reason: str = "") -> bool:
 
 def unblock_ip(ip: str) -> bool:
     """Remove the iptables DROP rule for the given IP."""
-    if ip not in _blocked_ips:
+    if not _valid_ip(ip) or ip not in _blocked_ips:
         return False
     try:
         subprocess.run(

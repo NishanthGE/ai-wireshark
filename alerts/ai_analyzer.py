@@ -7,16 +7,16 @@ import json
 import asyncio
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from config import ANTHROPIC_API_KEY, OPENAI_API_KEY, AI_PROVIDER, AI_MODEL
+from config import ANTHROPIC_API_KEY, AI_PROVIDER, AI_MODEL
 
 try:
     from config import GROQ_API_KEY
-except:
+except (ImportError, AttributeError):
     GROQ_API_KEY = ""
 
 try:
     from config import GEMINI_API_KEY
-except:
+except (ImportError, AttributeError):
     GEMINI_API_KEY = ""
 
 SYSTEM_PROMPT = """You are an expert network security analyst inside a real-time 
@@ -121,25 +121,36 @@ class AIAnalyzer:
 
             ai_result = json.loads(clean)
 
+            # Validate field types — AI occasionally returns wrong types
+            remediation = ai_result.get("remediation", [])
+            if not isinstance(remediation, list):
+                remediation = [str(remediation)] if remediation else []
+
+            risk_score = ai_result.get("risk_score", threat.get("risk_score", 0))
+            if not isinstance(risk_score, (int, float)):
+                risk_score = threat.get("risk_score", 0)
+            risk_score = max(0, min(100, int(risk_score)))
+
+            severity = ai_result.get("severity", threat.get("severity", "LOW"))
+            if severity not in ("LOW", "MEDIUM", "HIGH", "CRITICAL"):
+                severity = threat.get("severity", "LOW")
+
             return {
                 **threat,
                 "ai_analyzed":       True,
-                "ai_confirmed":      ai_result.get("confirmed", True),
-                "ai_threat_name":    ai_result.get("threat_name", threat["type"]),
-                "ai_explanation":    ai_result.get("explanation", ""),
-                "ai_risk_score":     ai_result.get("risk_score", threat["risk_score"]),
-                "ai_severity":       ai_result.get("severity", threat["severity"]),
-                "ai_remediation":    ai_result.get("remediation", []),
-                "ai_false_positive": ai_result.get("false_positive_reason", ""),
+                "ai_confirmed":      bool(ai_result.get("confirmed", True)),
+                "ai_threat_name":    str(ai_result.get("threat_name", threat.get("type", ""))),
+                "ai_explanation":    str(ai_result.get("explanation", "")),
+                "ai_risk_score":     risk_score,
+                "ai_severity":       severity,
+                "ai_remediation":    remediation,
+                "ai_false_positive": str(ai_result.get("false_positive_reason", "")),
             }
 
         except json.JSONDecodeError:
-            return {
-                **threat,
-                "ai_analyzed":    True,
-                "ai_explanation": response_text[:500],
-                "ai_confirmed":   True,
-            }
+            # AI returned non-JSON — don't mark as analyzed, keep original threat
+            print(f"[!] AI returned invalid JSON — skipping AI enrichment")
+            return {**threat, "ai_analyzed": False}
         except Exception as e:
             print(f"[!] AI analysis failed: {e}")
             return {**threat, "ai_analyzed": False}
